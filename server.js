@@ -50,17 +50,11 @@ app.post('/parse', async (req, res) => {
             if (!extractedUrl) {
                 return res.status(400).json({ error: '无法获取重定向链接' });
             }
-
-            // 处理slides链接
-            if (extractedUrl.includes('/slides/')) {
-                extractedUrl = extractedUrl.replace('/slides/', '/video/');
-            }
         } else if (pureVideoIdMatch) {
             extractedUrl = `https://www.iesdouyin.com/share/video/${videoUrl}`;
         } else {
             return res.status(400).json({ error: '请输入正确的抖音短链接或视频ID' });
         }
-        
 
         // 验证URL格式
         try {
@@ -69,8 +63,56 @@ app.post('/parse', async (req, res) => {
             return res.status(400).json({ error: '无效的URL格式' });
         }
 
+        // 检查是否是slides类型的链接
+        const slidesMatch = extractedUrl.match(/\/share\/slides\/(\d+)/);
+        if (slidesMatch) {
+            const slideId = slidesMatch[1];
+            const slidesApiUrl = `https://www.iesdouyin.com/web/api/v2/aweme/slidesinfo/?aweme_ids=%5B${slideId}%5D&request_source=200`;
+            
+            const slidesResponse = await axios.get(slidesApiUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36'
+                }
+            });
 
-        // 使用最终URL进行请求
+            const slidesData = slidesResponse.data;
+            if (!slidesData.aweme_details || slidesData.aweme_details.length === 0) {
+                return res.status(400).json({ error: '无法获取图文/视频信息' });
+            }
+
+            const itemInfo = slidesData.aweme_details[0];
+            const coverUrl = itemInfo.video?.cover?.url_list?.[0];
+            
+            let responseData = {
+                type: 'mixed',
+                coverUrl,
+                items: []
+            };
+
+            // 处理图片
+            if (itemInfo.images && itemInfo.images.length > 0) {
+                const imageList = itemInfo.images.map(image => ({
+                    type: 'image',
+                    url: image.url_list[0]
+                }));
+                responseData.items.push(...imageList);
+            }
+
+            // 处理视频
+            if (itemInfo.images[0].video && itemInfo.images[0].video.play_addr) {
+               
+                const videoUrls = itemInfo.images[0].video.play_addr.url_list.map(url => ({
+                    type: 'video',
+                    url: url.replace('playwm', 'play'),
+                    ratio: '720p'
+                }));
+                responseData.items.push(...videoUrls);
+            }
+
+            return res.json({ data: responseData });
+        }
+
+        // 处理普通视频链接
         const finalResponse = await axios.get(extractedUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36'
@@ -98,46 +140,21 @@ app.post('/parse', async (req, res) => {
 
         // 判断是否为图文类型
         if (itemInfo.aweme_type === 2) {
-            let hasVideo = false;
-            let videoInfo = null;
-
-            // 检查是否存在视频
-            if (itemInfo.video && itemInfo.video.play_addr) {
-                hasVideo = true;
-                videoInfo = itemInfo.video;
-            }
-
             // 处理图文内容
-            const imageList = itemInfo.images?.map(image => ({
+            const imageList = itemInfo.images.map(image => ({
                 url: image.url_list[0]
             })) || [];
 
+            if (imageList.length === 0) {
+                return res.status(400).json({ error: '无法获取图片信息' });
+            }
+
             responseData = {
-                type: 'mixed',
-                hasImages: imageList.length > 0,
-                hasVideo: hasVideo,
-                imageList: imageList
+                type: 'images',
+                imageList
             };
-
-            // 如果存在视频，添加视频信息
-            if (hasVideo) {
-                const coverUrl = videoInfo.cover?.url_list?.[0];
-                const urlList = videoInfo.play_addr.url_list.map(url => ({
-                    url: url.replace('playwm', 'play'),
-                    ratio: videoInfo.ratio || '720p'
-                }));
-
-                responseData.video = {
-                    urlList,
-                    coverUrl
-                };
-            }
-
-            if (!hasVideo && imageList.length === 0) {
-                return res.status(400).json({ error: '无法获取内容信息' });
-            }
         } else {
-            // 处理纯视频内容
+            // 处理视频内容
             const videoInfo = itemInfo.video;
             if (!videoInfo || !videoInfo.play_addr) {
                 return res.status(400).json({ error: '无法获取视频信息' });
