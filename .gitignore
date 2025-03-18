@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# vercel
+.vercel
+
 # Environment
 .env
 .env.local
@@ -25,3 +28,4 @@ yarn-error.log*
 # System Files
 .DS_Store
 Thumbs.db
+

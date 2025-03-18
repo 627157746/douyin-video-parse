@@ -8,8 +8,16 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/parse",
       "dest": "/server.js"
+    },
+    {
+      "src": "/",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }
