@@ -216,94 +216,98 @@
             try {
                 resultDiv.innerHTML = '正在解析...';
                 const response = await axios.post('/parse', { videoUrl });
-                const { type, urlList, coverUrl, imageList } = response.data.data;
+                const data = response.data.data;
                 
                 let html = '';
-                if (type === 'images') {
-                    // 处理图文内容
-                    html = '<h3>解析成功，图文内容如下：</h3>';
-                    html += '<div class="swiper">';
-                    html += '<div class="swiper-wrapper">';
-                    imageList.forEach((item, index) => {
+                if (data.type === 'mixed') {
+                    html = '<h3>解析成功，混合内容如下：</h3>';
+                    
+                    // 如果有图片，显示图片轮播
+                    if (data.hasImages && data.imageList.length > 0) {
+                        html += '<h4>图片内容：</h4>';
+                        html += '<div class="swiper">';
+                        html += '<div class="swiper-wrapper">';
+                        data.imageList.forEach((item, index) => {
+                            html += `
+                                <div class="swiper-slide">
+                                    <img src="${item.url}" alt="图片${index + 1}">
+                                    <button class="action-btn copy-btn" onclick="copyToClipboard('${item.url}')">复制图片链接</button>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        html += '<div class="swiper-pagination"></div>';
+                        html += '<div class="swiper-button-prev"></div>';
+                        html += '<div class="swiper-button-next"></div>';
+                        html += '</div>';
+                    }
+
+                    // 如果有视频，显示视频内容
+                    if (data.hasVideo && data.video) {
+                        html += '<h4>视频内容：</h4>';
                         html += `
-                            <div class="swiper-slide">
-                                <img src="${item.url}" alt="图片${index + 1}">
-                                <button class="action-btn copy-btn" onclick="copyToClipboard('${item.url}')">复制图片链接</button>
-                            </div>
+                            <div class="preview-container">
+                                <h3>视频封面：</h3>
+                                <div class="cover-preview">
+                                    <img src="${data.video.coverUrl}" alt="视频封面">
+                                </div>
+                                <h3>视频链接：</h3>
+                                <div class="video-list">
                         `;
-                    });
-                    html += '</div>';
-                    html += '<div class="swiper-pagination"></div>';
-                    html += '<div class="swiper-button-prev"></div>';
-                    html += '<div class="swiper-button-next"></div>';
-                    html += '</div>';
-                    html += '<div class="success-toast" id="copySuccess">复制成功！</div>';
-                } else {
-                    // 处理视频内容
+                        data.video.urlList.forEach(item => {
+                            html += `
+                                <div class="video-item">
+                                    <span class="quality-badge">${item.ratio}</span>
+                                    <a href="${item.url}" class="action-btn" target="_blank">在线播放</a>
+                                    <button class="action-btn" onclick="copyToClipboard('${item.url}')">复制链接</button>
+                                </div>
+                            `;
+                        });
+                        html += '</div></div>';
+                    }
+                } else if (data.type === 'video') {
+                    // 处理纯视频内容
                     html = `
                         <div class="preview-container">
                             <h3>视频封面：</h3>
-                            <div class="swiper">
-                                <div class="swiper-wrapper">
-                                    <div class="swiper-slide">
-                                        <img src="${coverUrl}" alt="视频封面">
-                                    </div>
-                                </div>
-                                <div class="swiper-pagination"></div>
+                            <div class="cover-preview">
+                                <img src="${data.coverUrl}" alt="视频封面">
                             </div>
-                        </div>
-                        <h3>解析成功，请选择视频质量：</h3>
-                        <div class="video-list">`;
-                    
-                    urlList.forEach((item, index) => {
+                            <h3>视频链接：</h3>
+                            <div class="video-list">
+                    `;
+                    data.urlList.forEach(item => {
                         html += `
                             <div class="video-item">
                                 <span class="quality-badge">${item.ratio}</span>
+                                <a href="${item.url}" class="action-btn" target="_blank">在线播放</a>
                                 <button class="action-btn" onclick="copyToClipboard('${item.url}')">复制链接</button>
                             </div>
                         `;
                     });
-                    html += '</div>';
+                    html += '</div></div>';
                 }
-                
+
+                html += '<div class="success-toast" id="copySuccess">复制成功！</div>';
                 resultDiv.innerHTML = html;
-                if (type === 'images') {
-                    initCarousel();
+
+                // 初始化Swiper
+                if (data.type === 'mixed' && data.hasImages || data.type === 'images') {
+                    new Swiper('.swiper', {
+                        navigation: {
+                            nextEl: '.swiper-button-next',
+                            prevEl: '.swiper-button-prev',
+                        },
+                        pagination: {
+                            el: '.swiper-pagination',
+                            clickable: true
+                        },
+                        loop: true
+                    });
                 }
             } catch (error) {
-                console.error('Error:', error);
-                resultDiv.innerHTML = `解析失败: ${error.response?.data?.error || error.message}`;
+                resultDiv.innerHTML = `解析失败：${error.response?.data?.error || error.message}`;
             }
-        }
-
-        function initCarousel() {
-            const swipers = document.querySelectorAll('.swiper');
-            swipers.forEach(swiperEl => {
-                new Swiper(swiperEl, {
-                    loop: true,
-                    autoplay: {
-                        delay: 3000,
-                        disableOnInteraction: false,
-                        pauseOnMouseEnter: true
-                    },
-                    pagination: {
-                        el: '.swiper-pagination',
-                        clickable: true,
-                        dynamicBullets: true
-                    },
-                    navigation: {
-                        nextEl: '.swiper-button-next',
-                        prevEl: '.swiper-button-prev'
-                    },
-                    centeredSlides: true,
-                    grabCursor: true,
-                    effect: 'fade',
-                    fadeEffect: {
-                        crossFade: true
-                    },
-                    speed: 600
-                });
-            });
         }
 
         function copyToClipboard(text) {
@@ -313,8 +317,6 @@
                 setTimeout(() => {
                     toast.style.display = 'none';
                 }, 2000);
-            }).catch(err => {
-                console.error('复制失败:', err);
             });
         }
     </script>

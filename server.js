@@ -50,6 +50,11 @@ app.post('/parse', async (req, res) => {
             if (!extractedUrl) {
                 return res.status(400).json({ error: '无法获取重定向链接' });
             }
+
+            // 处理slides链接
+            if (extractedUrl.includes('/slides/')) {
+                extractedUrl = extractedUrl.replace('/slides/', '/video/');
+            }
         } else if (pureVideoIdMatch) {
             extractedUrl = `https://www.iesdouyin.com/share/video/${videoUrl}`;
         } else {
@@ -63,6 +68,7 @@ app.post('/parse', async (req, res) => {
         } catch (error) {
             return res.status(400).json({ error: '无效的URL格式' });
         }
+
 
         // 使用最终URL进行请求
         const finalResponse = await axios.get(extractedUrl, {
@@ -92,21 +98,46 @@ app.post('/parse', async (req, res) => {
 
         // 判断是否为图文类型
         if (itemInfo.aweme_type === 2) {
+            let hasVideo = false;
+            let videoInfo = null;
+
+            // 检查是否存在视频
+            if (itemInfo.video && itemInfo.video.play_addr) {
+                hasVideo = true;
+                videoInfo = itemInfo.video;
+            }
+
             // 处理图文内容
-            const imageList = itemInfo.images.map(image => ({
+            const imageList = itemInfo.images?.map(image => ({
                 url: image.url_list[0]
             })) || [];
 
-            if (imageList.length === 0) {
-                return res.status(400).json({ error: '无法获取图片信息' });
+            responseData = {
+                type: 'mixed',
+                hasImages: imageList.length > 0,
+                hasVideo: hasVideo,
+                imageList: imageList
+            };
+
+            // 如果存在视频，添加视频信息
+            if (hasVideo) {
+                const coverUrl = videoInfo.cover?.url_list?.[0];
+                const urlList = videoInfo.play_addr.url_list.map(url => ({
+                    url: url.replace('playwm', 'play'),
+                    ratio: videoInfo.ratio || '720p'
+                }));
+
+                responseData.video = {
+                    urlList,
+                    coverUrl
+                };
             }
 
-            responseData = {
-                type: 'images',
-                imageList
-            };
+            if (!hasVideo && imageList.length === 0) {
+                return res.status(400).json({ error: '无法获取内容信息' });
+            }
         } else {
-            // 处理视频内容
+            // 处理纯视频内容
             const videoInfo = itemInfo.video;
             if (!videoInfo || !videoInfo.play_addr) {
                 return res.status(400).json({ error: '无法获取视频信息' });
@@ -131,8 +162,6 @@ app.post('/parse', async (req, res) => {
                 coverUrl
             };
         }
-
-
 
         res.json({ data: responseData });
     } catch (error) {
