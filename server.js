@@ -12,6 +12,11 @@ app.use(express.json());
 // 静态文件服务
 app.use(express.static('.'));
 
+// 添加根路径处理
+app.get('/', (req, res) => {
+    res.sendFile('index.html', { root: '.' });
+});
+
 // 处理视频链接解析请求
 app.post('/parse', async (req, res) => {
     try {
