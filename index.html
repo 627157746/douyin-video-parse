@@ -21,13 +21,34 @@
         }
         .input-group {
             margin-bottom: 20px;
+            position: relative;
         }
         input[type="text"] {
             width: 100%;
-            padding: 10px;
+            padding: 10px 30px 10px 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
             margin-bottom: 10px;
+            box-sizing: border-box;
+            word-break: break-all;
+            overflow-wrap: break-word;
+        }
+        .clear-input {
+            position: absolute;
+            right: 8px;
+            top: 10px;
+            transform: none;
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            padding: 4px;
+            width: auto;
+            display: none;
+        }
+        .clear-input:hover {
+            color: #666;
+            background: none;
         }
         button {
             background-color: #ff0050;
@@ -112,6 +133,7 @@
         <h1>抖音视频/图文解析</h1>
         <div class="input-group">
             <input type="text" id="videoUrl" placeholder="请输入抖音视频链接或ID">
+            <button class="clear-input" id="clearInput" onclick="clearInput()">✕</button>
             <button onclick="parseVideo()">解析</button>
         </div>
         <div class="loading" id="loading">
@@ -122,6 +144,20 @@
 
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script>
+        const videoUrlInput = document.getElementById('videoUrl');
+        const clearButton = document.getElementById('clearInput');
+
+        // 显示/隐藏清空按钮
+        videoUrlInput.addEventListener('input', function() {
+            clearButton.style.display = this.value ? 'block' : 'none';
+        });
+
+        // 清空输入框
+        function clearInput() {
+            videoUrlInput.value = '';
+            clearButton.style.display = 'none';
+        }
+
         async function parseVideo() {
             const videoUrl = document.getElementById('videoUrl').value.trim();
             const resultDiv = document.getElementById('result');
